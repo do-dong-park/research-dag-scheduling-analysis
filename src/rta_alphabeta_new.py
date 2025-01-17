@@ -1181,68 +1181,7 @@ def EO_iter(G_dict, C_dict, providers, consumers, Prio):
                 remove_nodes_in_list(theta_i, lamda_ve)
 
 
-def Eligiblity_Ordering_PA(G_dict, C_dict):
 
-    Prio = {}
-
-    # --------------------------------------------------------------------------
-    # I. load task parameters
-    C_exp = []
-    for key in sorted(C_dict):
-        C_exp.append(C_dict[key])
-
-    V_array = list(copy.deepcopy(G_dict).keys())
-    V_array.sort()
-    _, lamda = find_longest_path_dfs(G_dict, V_array[0], V_array[-1], C_exp)
-
-    VN_array = V_array.copy()
-
-    for i in lamda:
-        if i in VN_array:
-            VN_array.remove(i)
-
-    # --------------------------------------------------------------------------
-    # II. initialize eligbilities to -1
-    for i in G_dict:
-        Prio[i] = -1
-
-    # --------------------------------------------------------------------------
-    # III. providers and consumers
-    # iterative all critical nodes
-    # after this, all provides and consumers will be collected
-
-    # >> for time measurement
-    global time_EO_CPC
-    begin_time = time.time()
-    # << for time measurement
-    
-    providers, consumers = find_providers_consumers(G_dict, lamda, VN_array)
-
-    # >> for time measurement
-    time_EO_CPC = time.time() - begin_time
-    # << for time measurement
-
-    # --------------------------------------------------------------------------
-    # IV. Start iteration
-    # >> for time measurement
-    global time_EO
-    begin_time = time.time()
-    # << for time measurement
-
-    EO_iter(G_dict, C_dict, providers, consumers, Prio)
-
-    # >> for time measurement
-    time_EO = time.time() - begin_time
-    # << for time measurement
-
-    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    for i in Prio:
-        if Prio[i] <= 1:
-            pass
-            #raise Exception("Some prioirities are not assigned!")
-    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-    return Prio
 
 
 def Eligiblity_Ordering_PA_legacy(G_dict, C_dict):

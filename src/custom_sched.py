@@ -1,9 +1,17 @@
+import copy
 import logging
 import os
 import random
+import time
 
+# from graph import find_longest_path_dfs
 from processor import Core
-from rta_alphabeta_new import Eligiblity_Ordering_PA, load_task
+from rta_alphabeta_new import (
+    Eligiblity_Ordering_PA,
+    EO_iter,
+    find_providers_consumers,
+    load_task,
+)
 from task import DAGTask, Job
 
 EXECUTION_MODEL = [
@@ -19,6 +27,47 @@ MIGRATION_COST = 0
 
 PATH_OF_SRC = os.path.dirname(os.path.abspath(__file__))
 LOG_TO_FILE_LOCATION = PATH_OF_SRC + "/../results/log.txt"
+
+
+def find_all_paths(G_, start_vertex, end_vertex, path=[]):
+    """find all paths from start_vertex to end_vertex in graph"""
+    graph = G_
+    path = path + [start_vertex]
+
+    if start_vertex == end_vertex:
+        return [path]
+
+    if start_vertex not in graph:
+        return []
+
+    paths = []
+    for vertex in graph[start_vertex]:
+        if vertex not in path:
+            # solve this in a recursive way
+            extended_paths = find_all_paths(G_, vertex, end_vertex, path)
+            for p in extended_paths:
+                paths.append(p)
+
+    return paths
+
+
+def find_longest_path_dfs(G_, start_vertex, end_vertex, weights):
+    """find the longest path with depth first search"""
+
+    # find all paths
+    paths = find_all_paths(G_, start_vertex, end_vertex)
+
+    # search for the critical path
+    costs = []
+    for path in paths:
+        cost = 0
+        for v in path:
+            cost = cost + weights[v - 1]
+        costs.append(cost)
+
+    (m, i) = max((v, i) for i, v in enumerate(costs))
+
+    return (m, paths[i])
 
 
 def trace_init(log_to_file=False, debug=False):
@@ -49,6 +98,70 @@ def trace(msglevel, timestamp, message):
         logging.warning(msg)
     elif msglevel == 3:
         logging.error(msg)
+
+
+def Eligiblity_Ordering_PA(G_dict, C_dict):
+
+    Prio = {}
+
+    # --------------------------------------------------------------------------
+    # I. load task parameters
+    C_exp = []
+    for key in sorted(C_dict):
+        C_exp.append(C_dict[key])
+
+    V_array = list(copy.deepcopy(G_dict).keys())
+    V_array.sort()
+    _, lamda = find_longest_path_dfs(G_dict, V_array[0], V_array[-1], C_exp)
+
+    VN_array = V_array.copy()
+
+    for i in lamda:
+        if i in VN_array:
+            VN_array.remove(i)
+
+    # --------------------------------------------------------------------------
+    # II. initialize eligbilities to -1
+    for i in G_dict:
+        Prio[i] = -1
+
+    # --------------------------------------------------------------------------
+    # III. providers and consumers
+    # iterative all critical nodes
+    # after this, all provides and consumers will be collected
+
+    # >> for time measurement
+    global time_EO_CPC
+    begin_time = time.time()
+    # << for time measurement
+
+    providers, consumers = find_providers_consumers(G_dict, lamda, VN_array)
+
+    # >> for time measurement
+    time_EO_CPC = time.time() - begin_time
+    # << for time measurement
+
+    # --------------------------------------------------------------------------
+    # IV. Start iteration
+    # >> for time measurement
+    global time_EO
+    begin_time = time.time()
+    # << for time measurement
+
+    EO_iter(G_dict, C_dict, providers, consumers, Prio)
+
+    # >> for time measurement
+    time_EO = time.time() - begin_time
+    # << for time measurement
+
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    for i in Prio:
+        if Prio[i] <= 1:
+            pass
+            # raise Exception("Some prioirities are not assigned!")
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+    return Prio
 
 
 def sched(dag, algorithm="random", execution_model="WCET"):
